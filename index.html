@@ -1,0 +1,822 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Network Overview — Tower Portfolio</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/d3@7.9.0/dist/d3.min.js" integrity="sha384-CjloA8y00+1SDAUkjs099PVfnY2KmDC2BZnws9kh8D/lX1s46w6EPhpXdqMfjK6i" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/topojson-client@3.1.0/dist/topojson-client.min.js" integrity="sha384-Ukv1p/xTma6P4/2bY5KzWBw+ydSpXmhCMtyciIQVDJ1RmOxtCYNMF1uXT9T63H67" crossorigin="anonymous"></script>
+<style>
+  :root{
+    --n50:#fdfdfd; --n100:#f7f7f7; --n200:#eff0f1; --n300:#e6e8ea; --n400:#d9dbdd;
+    --n500:#c9cccf; --n600:#b6b9bc; --n700:#a2a5a8; --n800:#8b8e91; --n900:#707478;
+    --n1000:#535659; --n1100:#313335; --n1200:#191a1b;
+    --brand:#FF5A14; --brand50:#fff2ec; --brand100:#ffdccb; --brand600:#d94500; --brand700:#953000;
+    --red:#e51c01; --red50:#fceae6; --red700:#8d0d00;
+    --amber:#cd9c00; --amber50:#fff4dd; --amber700:#8e6b00;
+    --green:#00852c; --green50:#e0ffe2; --green700:#006420;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{font-family:Inter,system-ui,sans-serif;letter-spacing:-0.01em;color:var(--n1200);background:#eef0f1;overflow:hidden}
+  a{color:var(--brand600);text-decoration:none}
+  a:hover{color:var(--brand700)}
+  button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+  .stage{position:fixed;inset:0;min-width:1180px}
+  #map{position:absolute;inset:0;width:100%;height:100%;cursor:grab}
+  #map:active{cursor:grabbing}
+  .card{background:#fdfdfdf2;backdrop-filter:blur(10px);border:1px solid var(--n300);border-radius:12px}
+
+  /* ---------- rail ---------- */
+  .rail{position:absolute;left:14px;top:14px;bottom:14px;width:52px;z-index:5;display:flex;flex-direction:column;align-items:center;padding:8px 0;gap:2px}
+  .logo{width:34px;height:34px;border-radius:9px;background:var(--brand);display:grid;place-items:center;margin-bottom:10px}
+  .railbtn{width:36px;height:36px;border-radius:8px;display:grid;place-items:center;color:var(--n900);position:relative}
+  .railbtn:hover{background:var(--n100);color:var(--n1100)}
+  .railbtn.on{background:var(--brand50);color:var(--brand600)}
+  .rail .spacer{flex:1}
+  .dot-alert{position:absolute;top:6px;right:6px;width:6px;height:6px;border-radius:50%;background:var(--red);border:1.5px solid #fff}
+
+  /* ---------- left column ---------- */
+  .left{position:absolute;left:80px;top:14px;bottom:14px;width:322px;z-index:5;display:flex;flex-direction:column;gap:10px}
+  .hero{padding:18px 20px 16px}
+  .eyebrow{font-size:10px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:var(--n800)}
+  h1{font-size:29px;line-height:34px;font-weight:600;letter-spacing:-0.04em;margin-top:7px}
+  .sync{margin-top:12px;padding-top:12px;border-top:1px solid var(--n300);display:flex;align-items:center;gap:7px;font-size:11px;color:var(--n900)}
+  .pulse{width:6px;height:6px;border-radius:50%;background:var(--green);animation:pulse 2.4s infinite}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.25}}
+  .sync .r{margin-left:auto;font-variant-numeric:tabular-nums}
+  .stack{flex:1;min-height:0;overflow-y:auto;scrollbar-width:thin;display:flex;flex-direction:column}
+
+  .kpis{display:grid;grid-template-columns:1fr 1fr}
+  .kpi{padding:14px 16px;border-bottom:1px solid var(--n300)}
+  .kpi:nth-child(odd){border-right:1px solid var(--n300)}
+  .kpi .lbl{font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--n800)}
+  .kpi .val{font-size:25px;font-weight:600;letter-spacing:-0.04em;margin-top:7px;display:flex;align-items:baseline;gap:4px}
+  .kpi .val small{font-size:11px;font-weight:500;color:var(--n900);letter-spacing:0}
+  .kpi .row{display:flex;align-items:center;gap:9px;margin-top:7px}
+  .kpi .cap{font-size:10px;color:var(--n900);margin-top:7px}
+  .stackbar{display:flex;height:5px;border-radius:1000px;overflow:hidden;background:var(--n200);width:100%}
+  .stackbar i{display:block;height:100%}
+  .trend{display:flex;align-items:flex-end;gap:2px;height:22px;flex:1}
+  .trend i{display:block;flex:1;border-radius:1px;background:var(--n400)}
+  .trend i.hot{background:var(--brand)}
+  .sect{padding:14px 16px;border-bottom:1px solid var(--n300)}
+  .sect:last-child{border-bottom:0}
+  .sect-head{display:flex;align-items:center;gap:8px;margin-bottom:11px}
+  .sect-title{font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--n800)}
+  .sect-head .r{margin-left:auto;font-size:10px;color:var(--n900);font-variant-numeric:tabular-nums}
+  .sect-link{margin-left:auto;font-size:11px;font-weight:500;color:var(--brand600)}
+
+  /* status filter list */
+  .stat-row{display:grid;grid-template-columns:8px 1fr auto;align-items:center;gap:9px;padding:7px 8px;margin:0 -8px;border-radius:6px;cursor:pointer;font-size:12px}
+  .stat-row:hover{background:var(--n100)}
+  .stat-row.on{background:var(--n1200);color:var(--n50)}
+  .stat-row.on .num{color:var(--n50)}
+  .stat-row i{width:8px;height:8px;border-radius:50%;display:block}
+  .stat-row .num{color:var(--n900);font-variant-numeric:tabular-nums;font-size:11px;font-weight:500}
+
+  /* predictive insights — highlighted */
+  .ai{background:var(--brand);color:#fff;padding:15px 16px;border-bottom:1px solid var(--brand600)}
+  .ai .h{display:flex;align-items:center;gap:8px;font-size:10px;font-weight:600;letter-spacing:.08em;text-transform:uppercase}
+  .ai .h .pill{margin-left:auto;background:#ffffff2e;border-radius:1000px;padding:2px 7px;letter-spacing:.04em}
+  .aiitem{margin-top:11px;padding-top:11px;border-top:1px solid #ffffff33;cursor:pointer}
+  .aiitem:first-of-type{border-top:0;padding-top:0}
+  .aiitem .t{font-size:12px;line-height:17px;font-weight:500}
+  .aiitem:hover .t{text-decoration:underline}
+  .aiitem .m{margin-top:6px;display:flex;align-items:center;gap:8px;font-size:10px;opacity:.85}
+  .conf{height:3px;flex:1;max-width:56px;border-radius:1000px;background:#ffffff40;overflow:hidden}
+  .conf i{display:block;height:100%;background:#fff}
+
+  .alarm{display:grid;grid-template-columns:1fr auto;gap:2px 10px;padding:9px 8px;margin:0 -8px;border-radius:6px;cursor:pointer}
+  .alarm:hover{background:var(--n100)}
+  .alarm+.alarm{border-top:1px solid var(--n200)}
+  .alarm-t{font-size:12px;font-weight:500;line-height:16px}
+  .alarm-s{font-size:10px;color:var(--n900);grid-column:1}
+  .alarm-time{grid-row:1/3;align-self:center;font-size:10px;font-weight:600;padding:2px 6px;border-radius:4px;white-space:nowrap;font-variant-numeric:tabular-nums}
+  .bar-item{display:grid;grid-template-columns:1fr auto;gap:5px 8px;font-size:12px;cursor:pointer}
+  .bar-item+.bar-item{margin-top:10px}
+  .bar-item:hover .bar-name{color:var(--brand600)}
+  .bar-name{color:var(--n1100);font-weight:500}
+  .bar-num{color:var(--n900);font-variant-numeric:tabular-nums;font-size:11px}
+  .bar-track{grid-column:1/3;display:block;height:4px;border-radius:1000px;background:var(--n200);overflow:hidden}
+  .bar-fill{display:block;height:4px;border-radius:1000px}
+
+  /* ---------- floating map controls ---------- */
+  .mapctl{position:absolute;top:14px;left:416px;right:14px;z-index:5;display:flex;align-items:flex-start;gap:8px;pointer-events:none}
+  .mapctl>*{pointer-events:auto}
+  .ctlbtn{height:36px;min-width:36px;padding:0 10px;border-radius:9px;display:flex;align-items:center;gap:8px;font-size:12px;font-weight:500;color:var(--n1100);background:#fdfdfdf2;backdrop-filter:blur(10px);border:1px solid var(--n300)}
+  .ctlbtn:hover{background:#fff}
+  .ctlbtn.on{border-color:var(--brand);color:var(--brand700);background:var(--brand50)}
+  .ctlbtn b{font-weight:600;color:var(--n900);font-variant-numeric:tabular-nums}
+  .searchbox{display:flex;align-items:center;gap:8px;height:36px;border-radius:9px;background:#fdfdfdf2;backdrop-filter:blur(10px);border:1px solid var(--n300);padding:0 10px;width:36px;overflow:hidden;transition:width .18s ease}
+  .searchbox.open{width:290px;border-color:var(--brand)}
+  .searchbox svg{flex:0 0 15px;color:var(--n1000);cursor:pointer}
+  .searchbox input{border:0;outline:0;font:inherit;font-size:12px;color:var(--n1200);background:none;width:100%;opacity:0;transition:opacity .15s}
+  .searchbox.open input{opacity:1}
+  .locwrap{position:relative}
+  .locmenu{position:absolute;top:42px;left:0;width:250px;max-height:330px;overflow-y:auto;background:#fdfdfdfa;backdrop-filter:blur(10px);border:1px solid var(--n300);border-radius:10px;padding:6px;display:none;scrollbar-width:thin}
+  .locmenu.open{display:block}
+  .locitem{width:100%;display:flex;align-items:center;gap:8px;padding:7px 9px;border-radius:6px;font-size:12px;color:var(--n1100)}
+  .locitem:hover{background:var(--n100)}
+  .locitem.on{background:var(--brand50);color:var(--brand700)}
+  .locitem b{margin-left:auto;font-weight:600;font-size:11px;color:var(--n900);font-variant-numeric:tabular-nums}
+  .locgroup{font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--n800);padding:8px 9px 4px}
+  .aichip{display:none;align-items:center;gap:8px;height:36px;padding:0 8px 0 12px;border-radius:9px;font-size:12px;font-weight:500;color:#fff;background:var(--brand);border:1px solid var(--brand600)}
+  .aichip.show{display:flex}
+  .aichip button{width:18px;height:18px;border-radius:50%;display:grid;place-items:center;color:#fff}
+  .aichip button:hover{background:#ffffff33}
+  .zoomstack{position:absolute;right:14px;bottom:14px;z-index:5;display:flex;flex-direction:column;background:#fdfdfdf2;backdrop-filter:blur(10px);border:1px solid var(--n300);border-radius:9px;overflow:hidden}
+  .zoomstack button{width:34px;height:34px;display:grid;place-items:center;color:var(--n1000)}
+  .zoomstack button+button{border-top:1px solid var(--n300)}
+  .zoomstack button:hover{background:var(--n100)}
+  .bottombar{position:absolute;left:416px;bottom:14px;z-index:5;display:flex;align-items:center;gap:8px}
+  .seg{display:flex;padding:3px;gap:2px;border-radius:9px;background:#fdfdfdf2;backdrop-filter:blur(10px);border:1px solid var(--n300)}
+  .seg button{height:28px;padding:0 12px;border-radius:6px;font-size:12px;font-weight:500;color:var(--n1000)}
+  .seg button.on{background:var(--n1200);color:var(--n50)}
+  .wxpill{display:flex;align-items:center;gap:9px;height:34px;padding:0 12px;border-radius:9px;background:#fdfdfdf2;backdrop-filter:blur(10px);border:1px solid var(--n300);font-size:11px;color:var(--n1000)}
+  .wxpill b{font-weight:600;color:var(--n1200)}
+  .wxpill .sep{width:1px;height:16px;background:var(--n300)}
+  .scalebar{position:absolute;right:60px;bottom:18px;z-index:5;font-size:10px;color:var(--n900);text-align:right}
+  .scalebar div{height:4px;border-left:1px solid var(--n700);border-right:1px solid var(--n700);border-bottom:1px solid var(--n700);width:96px;margin-top:3px;margin-left:auto}
+  .tooltip{position:absolute;z-index:8;pointer-events:none;background:var(--n1200);color:var(--n50);border-radius:8px;padding:8px 10px;font-size:11px;line-height:15px;opacity:0;transition:opacity .12s;transform:translate(-50%,-100%);white-space:nowrap}
+  .tooltip b{font-weight:600;font-size:12px}
+  .tooltip .tt-sub{color:var(--n600)}
+  .nomatch{position:absolute;left:calc(50% + 60px);top:50%;transform:translate(-50%,-50%);z-index:6;display:none;flex-direction:column;align-items:center;gap:10px;padding:18px 22px;text-align:center;max-width:280px}
+  .nomatch.show{display:flex}
+  .nomatch .t{font-size:13px;font-weight:600}
+  .nomatch .p{font-size:12px;color:var(--n900);line-height:17px}
+  .lbl-city{font-weight:500;fill:var(--n1100);pointer-events:none;paint-order:stroke;stroke:#eef0f1;stroke-linejoin:round}
+  .lbl-water{font-weight:400;fill:#a9b6bd;letter-spacing:.16em;text-transform:uppercase;pointer-events:none}
+  .cluster-lbl{font-weight:500;fill:var(--n1000);pointer-events:none;paint-order:stroke;stroke:#eef0f1}
+
+  /* ---------- detail ---------- */
+  .detail{position:absolute;right:14px;top:14px;bottom:14px;width:336px;z-index:6;display:none;flex-direction:column;overflow:hidden}
+  .detail.show{display:flex}
+  .detail-top{padding:13px 16px;display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:11px;color:var(--n900);border-bottom:1px solid var(--n300)}
+  .detail-scroll{overflow-y:auto;flex:1;scrollbar-width:thin}
+  .detail h2{font-size:28px;line-height:32px;font-weight:600;letter-spacing:-0.04em;padding:16px 16px 0}
+  .detail .place{padding:6px 16px 0;font-size:12px;color:var(--n900)}
+  .badges{display:flex;flex-wrap:wrap;gap:6px;padding:13px 16px 15px}
+  .badge{height:22px;padding:0 8px;border-radius:1000px;font-size:11px;font-weight:500;display:flex;align-items:center;gap:5px}
+  .badge i{width:6px;height:6px;border-radius:50%;display:block}
+  .banner{margin:0 16px 14px;border-radius:8px;padding:10px 12px;display:flex;gap:9px;font-size:12px;line-height:16px;background:var(--red50);color:var(--red700);border:1px solid #ffcfc6}
+  .banner.warn{background:var(--amber50);color:var(--amber700);border-color:#ffe2a1}
+  .banner b{font-weight:600}
+  .aiblock{margin:0 16px 16px;border-radius:10px;background:var(--brand);color:#fff;padding:14px}
+  .aiblock .h{display:flex;align-items:center;gap:7px;font-size:10px;font-weight:600;letter-spacing:.08em;text-transform:uppercase}
+  .aiblock .cause{font-size:12px;line-height:17px;margin-top:10px;opacity:.95}
+  .aiblock ol{margin-top:11px;padding-left:0;list-style:none;display:flex;flex-direction:column;gap:8px}
+  .aiblock li{font-size:12px;line-height:16px;display:grid;grid-template-columns:16px 1fr;gap:8px;align-items:start}
+  .aiblock li em{font-style:normal;width:16px;height:16px;border-radius:50%;background:#ffffff2e;display:grid;place-items:center;font-size:10px;font-weight:600}
+  .aiblock .foot{margin-top:12px;padding-top:10px;border-top:1px solid #ffffff33;display:flex;align-items:center;gap:8px;font-size:10px;opacity:.9}
+  .spec-grid{display:grid;grid-template-columns:1fr 1fr;border-top:1px solid var(--n300)}
+  .spec{padding:12px 16px;border-bottom:1px solid var(--n300)}
+  .spec:nth-child(odd){border-right:1px solid var(--n300)}
+  .spec .lbl{font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--n800)}
+  .spec .val{font-size:19px;font-weight:600;letter-spacing:-0.04em;margin-top:5px}
+  .spec .val small{font-size:11px;font-weight:500;color:var(--n900);letter-spacing:0;margin-left:3px}
+  .wx{padding:14px 16px;border-bottom:1px solid var(--n300)}
+  .wx-top{display:flex;align-items:center;justify-content:space-between;gap:10px}
+  .wx-temp{font-size:28px;font-weight:600;letter-spacing:-0.04em;line-height:1}
+  .wx-cond{font-size:12px;color:var(--n1000);margin-top:5px}
+  .wx-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:12px}
+  .wx-cell{border:1px solid var(--n300);border-radius:8px;padding:7px 9px}
+  .wx-cell .k{font-size:10px;color:var(--n900)}
+  .wx-cell .v{font-size:13px;font-weight:500;margin-top:3px}
+  .wx-note{margin-top:10px;font-size:11px;line-height:16px;color:var(--amber700);background:var(--amber50);border:1px solid #ffe2a1;border-radius:8px;padding:8px 10px}
+  .tenants{padding:14px 16px;border-bottom:1px solid var(--n300)}
+  .tenant{display:flex;align-items:center;gap:10px;padding:9px 0;font-size:12px}
+  .tenant+.tenant{border-top:1px solid var(--n200)}
+  .avatar{width:26px;height:26px;border-radius:7px;display:grid;place-items:center;font-size:10px;font-weight:600}
+  .tenant .tn{font-weight:500}
+  .tenant .ts{font-size:10px;color:var(--n900)}
+  .tenant .right{margin-left:auto;font-size:11px;color:var(--n900);font-variant-numeric:tabular-nums}
+  .lease{padding:14px 16px}
+  .lease-rows{display:flex;flex-direction:column;gap:8px;margin-top:10px}
+  .lease-rows .r{display:flex;justify-content:space-between;font-size:12px}
+  .lease-rows .r span:first-child{color:var(--n900)}
+  .lease-rows .r span:last-child{font-weight:500;font-variant-numeric:tabular-nums}
+  .detail-foot{border-top:1px solid var(--n300);padding:11px 16px;display:flex;gap:8px}
+  .btn{height:36px;border-radius:8px;padding:0 14px;font-size:13px;font-weight:500;display:flex;align-items:center;justify-content:center;gap:7px;border:1px solid transparent}
+  .btn-primary{background:var(--brand);color:#fff;flex:1;border-color:var(--brand600)}
+  .btn-primary:hover{background:var(--brand600)}
+  .btn-sec{background:#fff;color:var(--n1100);border-color:var(--n400)}
+  .btn-sec:hover{background:var(--n100)}
+  .spark{display:flex;align-items:flex-end;gap:2px;height:20px;margin-top:7px}
+  .spark i{flex:1;background:var(--n400);border-radius:1px;display:block}
+</style>
+</head>
+<body>
+<div class="stage">
+  <svg id="map"></svg>
+
+  <nav class="rail card">
+    <div class="logo"><svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="#fff" stroke-width="1.4"><circle cx="9" cy="9" r="2"/><path d="M4.2 13.8a6.8 6.8 0 0 1 0-9.6M13.8 4.2a6.8 6.8 0 0 1 0 9.6"/></svg></div>
+    <button class="railbtn on" title="Network overview"><svg width="17" height="17" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 8.5 10 3l7 5.5V17H3z"/></svg></button>
+    <button class="railbtn" title="Sites"><svg width="17" height="17" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="6" height="6" rx="1.5"/><rect x="11" y="3" width="6" height="6" rx="1.5"/><rect x="3" y="11" width="6" height="6" rx="1.5"/><rect x="11" y="11" width="6" height="6" rx="1.5"/></svg></button>
+    <button class="railbtn" title="Alarms"><svg width="17" height="17" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M10 3.5 17 16H3z"/><path d="M10 8v3.5" stroke-linecap="round"/></svg><span class="dot-alert"></span></button>
+    <button class="railbtn" title="Leases"><svg width="17" height="17" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="4" y="3" width="12" height="14" rx="2"/><path d="M7 7h6M7 10h6M7 13h4"/></svg></button>
+    <button class="railbtn" title="Work orders"><svg width="17" height="17" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="6" width="14" height="11" rx="2"/><path d="M7 6V4h6v2"/></svg></button>
+    <button class="railbtn" title="Reports"><svg width="17" height="17" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M4 16V9M8.7 16V4M13.3 16v-5M18 16V7"/></svg></button>
+    <div class="spacer"></div>
+    <button class="railbtn" title="Notifications"><svg width="17" height="17" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M6 9a4 4 0 0 1 8 0v3l1.5 2.5h-11L6 12z"/><path d="M8.5 15a1.5 1.5 0 0 0 3 0"/></svg></button>
+    <button class="railbtn" title="Settings"><svg width="17" height="17" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="10" cy="10" r="2.4"/><circle cx="10" cy="10" r="6.5"/></svg></button>
+  </nav>
+
+  <div class="left">
+    <section class="card hero">
+      <div class="eyebrow">Kingdom of Saudi Arabia</div>
+      <h1>Network<br>Overview</h1>
+      <div class="sync"><span class="pulse"></span> Live from NOC <span class="r">synced 2 min ago</span></div>
+    </section>
+
+    <section class="card stack">
+      <div class="kpis">
+        <div class="kpi">
+          <div class="lbl">Total sites</div>
+          <div class="val" id="kTotal">—</div>
+          <div class="stackbar" id="kMix"></div>
+          <div class="cap" id="kMixCap"></div>
+        </div>
+        <div class="kpi">
+          <div class="lbl">Availability</div>
+          <div class="val" id="kAvail">—<small>%</small></div>
+          <div class="row"><svg width="30" height="30" viewBox="0 0 30 30" id="kRing"></svg><span class="cap" style="margin:0">30-day mean<br>uptime</span></div>
+        </div>
+        <div class="kpi">
+          <div class="lbl">Needs action</div>
+          <div class="val" id="kAction" style="color:var(--brand600)">—</div>
+          <div class="row"><span class="trend" id="kTrend"></span></div>
+          <div class="cap">Open alarms, last 7 days</div>
+        </div>
+        <div class="kpi">
+          <div class="lbl">Tenancy</div>
+          <div class="val" id="kRatio">—<small>× per site</small></div>
+          <div class="stackbar" id="kSlots"></div>
+          <div class="cap" id="kSlotsCap"></div>
+        </div>
+      </div>
+
+      <div class="ai">
+        <div class="h">Predictive insights <span class="pill">AI</span></div>
+        <div id="aiList"></div>
+      </div>
+
+      <div class="sect">
+        <div class="sect-head"><span class="sect-title">Site status</span><span class="r">tap to filter</span></div>
+        <div id="statusList"></div>
+      </div>
+
+      <div class="sect">
+        <div class="sect-head"><span class="sect-title">Open alarms</span><button class="sect-link" id="allAlarms">View all</button></div>
+        <div id="alarmList"></div>
+      </div>
+
+      <div class="sect">
+        <div class="sect-head"><span class="sect-title">Leaseholders</span><span class="r" id="tenantTotal"></span></div>
+        <div id="tenantBars"></div>
+      </div>
+    </section>
+  </div>
+
+  <div class="mapctl">
+    <div class="searchbox" id="searchBox">
+      <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" id="searchIcon"><circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5 14 14" stroke-linecap="round"/></svg>
+      <input id="searchInput" placeholder="Site ID, city or leaseholder">
+    </div>
+    <div class="locwrap">
+      <button class="ctlbtn" id="locBtn">
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 14s4.5-4.2 4.5-7.5A4.5 4.5 0 0 0 3.5 6.5C3.5 9.8 8 14 8 14z"/><circle cx="8" cy="6.4" r="1.6"/></svg>
+        <span id="locLabel">All Kingdom</span><b id="locCount"></b>
+        <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 6.5 8 10.5l4-4" stroke-linecap="round"/></svg>
+      </button>
+      <div class="locmenu" id="locMenu"></div>
+    </div>
+    <div class="aichip" id="aiChip"><span id="aiChipLabel"></span><button id="aiChipClear" title="Clear insight filter"><svg width="9" height="9" viewBox="0 0 10 10" stroke="currentColor" stroke-width="1.6"><path d="M2 2l6 6M8 2l-6 6" stroke-linecap="round"/></svg></button></div>
+  </div>
+
+  <div class="bottombar">
+    <div class="seg" id="basemapSeg">
+      <button class="on" data-mode="sites">Sites</button>
+      <button data-mode="density">Density</button>
+    </div>
+    <div class="wxpill" id="wxPill"></div>
+  </div>
+
+  <div class="zoomstack">
+    <button id="zin"><svg width="14" height="14" viewBox="0 0 16 16" stroke="currentColor" stroke-width="1.6"><path d="M8 3v10M3 8h10" stroke-linecap="round"/></svg></button>
+    <button id="zout"><svg width="14" height="14" viewBox="0 0 16 16" stroke="currentColor" stroke-width="1.6"><path d="M3 8h10" stroke-linecap="round"/></svg></button>
+    <button id="zreset"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="5.5"/><circle cx="8" cy="8" r="1.4"/></svg></button>
+  </div>
+  <div class="scalebar">200 km<div></div></div>
+  <div class="tooltip" id="tip"></div>
+  <div class="nomatch card" id="noMatch">
+    <div class="t">No sites match these filters</div>
+    <div class="p">Status, location and insight filters have no sites in common.</div>
+    <button class="btn btn-sec" id="clearAll">Clear all filters</button>
+  </div>
+
+  <aside class="detail card" id="detail"></aside>
+</div>
+
+<script>
+/* ---------------- data ---------------- */
+function rng(seed){return function(){seed|=0;seed=seed+0x6D2B79F5|0;var t=Math.imul(seed^seed>>>15,1|seed);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+const R=rng(20260812);
+const gauss=()=>{let u=0,v=0;while(!u)u=R();while(!v)v=R();return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v)};
+
+const CITIES=[
+ ["Riyadh","Central",24.71,46.68,92,.55],["Jeddah","Western",21.49,39.19,71,.42],
+ ["Makkah","Western",21.39,39.86,34,.28],["Madinah","Western",24.47,39.61,28,.30],
+ ["Dammam","Eastern",26.43,50.10,30,.26],["Al Khobar","Eastern",26.28,50.20,18,.18],
+ ["Jubail","Eastern",27.00,49.66,14,.22],["Al Hofuf","Eastern",25.36,49.59,16,.26],
+ ["Taif","Western",21.27,40.42,18,.26],["Buraydah","Qassim",26.33,43.97,16,.26],
+ ["Unaizah","Qassim",26.08,43.99,8,.20],["Hail","Northern",27.52,41.69,12,.30],
+ ["Tabuk","Northern",28.38,36.57,14,.34],["Abha","Southern",18.22,42.51,14,.24],
+ ["Khamis Mushait","Southern",18.31,42.73,10,.20],["Jazan","Southern",16.89,42.57,12,.26],
+ ["Najran","Southern",17.49,44.13,9,.28],["Yanbu","Western",24.09,38.06,10,.24],
+ ["Al Bahah","Southern",20.01,41.47,7,.22],["Arar","Northern",30.98,41.04,7,.26],
+ ["Sakaka","Northern",29.97,40.21,7,.26],["Al Qurayyat","Northern",31.33,37.34,5,.22],
+ ["Rafha","Northern",29.62,43.49,4,.26],["Wadi ad-Dawasir","Central",20.49,44.79,5,.30],
+ ["Sharurah","Southern",17.47,47.11,3,.30],["AlUla","Western",26.61,37.92,4,.26],
+ ["Duba","Northern",27.35,35.69,4,.22],["NEOM","Northern",27.90,35.60,6,.34],
+ ["Al Kharj","Central",24.15,47.31,8,.24],["Qatif","Eastern",26.56,49.99,8,.16],
+ ["Hafar Al Batin","Eastern",28.43,45.97,8,.28],["Bisha","Southern",19.98,42.60,5,.28],
+ ["Turaif","Northern",31.67,38.66,3,.24]
+];
+const CORRIDORS=[[24.71,46.68,26.43,50.10,"Eastern","Riyadh–Dammam Corridor",6],
+ [24.71,46.68,21.49,39.19,"Central","Riyadh–Makkah Corridor",7],
+ [21.49,39.19,24.47,39.61,"Western","Coastal Corridor",5]];
+const BACKBONE=[["Riyadh","Dammam"],["Riyadh","Buraydah"],["Riyadh","Al Kharj"],["Riyadh","Jeddah"],
+ ["Jeddah","Makkah"],["Jeddah","Madinah"],["Madinah","Tabuk"],["Tabuk","NEOM"],["Buraydah","Hail"],
+ ["Hail","Arar"],["Dammam","Jubail"],["Dammam","Al Hofuf"],["Jeddah","Abha"],["Abha","Jazan"],["Abha","Najran"],
+ ["Riyadh","Wadi ad-Dawasir"],["Sakaka","Arar"],["Madinah","AlUla"]];
+const OPS=[["stc","#fff2ec","#953000"],["Mobily","#ecf7ff","#004e73"],["Zain KSA","#e0ffe2","#006420"],
+ ["Salam","#fff4dd","#8e6b00"],["GO Telecom","#fff1f3","#890038"],["Virgin Mobile","#fceae6","#8d0d00"]];
+const TYPES=["Ground-based tower","Rooftop tower","Monopole","Camouflaged pole","Guyed mast"];
+const ALARMS_CRIT=["Commercial power outage","Transmission link down","Rectifier fault"];
+const ALARMS_ATT=["Generator fuel low","Shelter temperature high","Door open / intrusion","Battery bank degraded"];
+const WXK=[["Clear","clear",0],["Hazy","haze",0],["Blowing dust","dust",1],["Sandstorm risk","dust",2],["Humid","humid",0],["Light rain","rain",0]];
+
+const sites=[];let n=0;
+function pushSite(name,region,lat,lon){
+  n++;const r=R();
+  const status=r<0.877?"active":r<0.932?"attention":r<0.962?"critical":"inactive";
+  const tCount=status==="inactive"?0:(R()<0.30?1:R()<0.78?2:R()<0.94?3:4);
+  const pool=[...OPS].sort(()=>R()-0.5).slice(0,tCount);
+  const w=WXK[Math.floor(R()*WXK.length)];
+  sites.push({
+    id:"TWL-"+region.slice(0,2).toUpperCase()+"-"+String(1000+n).slice(1),
+    name,region,lat,lon,status,
+    type:TYPES[Math.floor(R()*TYPES.length)],
+    height:Math.round(25+R()*50),
+    uptime:+(97.4+R()*2.55).toFixed(2),
+    power:R()<0.18?"Hybrid solar":R()<0.9?"Grid + genset":"Off-grid genset",
+    tenants:pool.map(o=>({name:o[0],pal:o,since:2016+Math.floor(R()*9),rent:Math.round((38+R()*46))*1000})),
+    capacity:3+Math.floor(R()*3),
+    leaseStart:2015+Math.floor(R()*8),
+    leaseYears:[10,12,15,20][Math.floor(R()*4)],
+    alarm:status==="critical"?{kind:ALARMS_CRIT[Math.floor(R()*3)],sev:"critical",mins:Math.floor(4+R()*720)}
+        :status==="attention"?{kind:ALARMS_ATT[Math.floor(R()*4)],sev:"attention",mins:Math.floor(30+R()*2600)}:null,
+    lastVisit:Math.floor(R()*180),
+    wx:{cond:w[0],icon:w[1],risk:w[2],temp:Math.round(24+R()*22),wind:Math.round(6+R()*46),
+        hum:Math.round(8+R()*62),vis:+(2+R()*9).toFixed(1),gust:Math.round(20+R()*50)}
+  });
+}
+CITIES.forEach(([name,region,lat,lon,c,sp])=>{for(let i=0;i<c;i++)pushSite(name,region,lat+gauss()*sp*0.62,lon+gauss()*sp*0.68)});
+CORRIDORS.forEach(([a,b,c,d,region,name,ct])=>{for(let i=0;i<ct;i++){const t=(i+0.6)/(ct+0.2);pushSite(name,region,a+(c-a)*t+gauss()*0.11,b+(d-b)*t+gauss()*0.11)}});
+
+const COLORS={active:"#00852c",attention:"#cd9c00",critical:"#e51c01",inactive:"#b6b9bc"};
+const TONE={active:["#e0ffe2","#006420"],attention:["#fff4dd","#8e6b00"],critical:["#fceae6","#8d0d00"],inactive:["#eff0f1","#535659"]};
+const LABEL={active:"Active",attention:"Needs attention",critical:"Critical alarm",inactive:"Inactive"};
+const cnt=s=>sites.filter(x=>x.status===s).length;
+const nf=v=>v.toLocaleString("en-US");
+const ago=m=>m<60?m+" min":m<1440?Math.floor(m/60)+" hr":Math.floor(m/1440)+" d";
+
+const AI_SITE={
+ "Commercial power outage":{cause:"Grid feeder instability in this district — third outage in 30 days. Genset started automatically; fuel autonomy is now the constraint.",
+   acts:["Dispatch fuel top-up before autonomy drops under 6 h","Raise a grid-quality case with the utility for this feeder","Flag the site for a hybrid-solar retrofit study"],conf:91},
+ "Transmission link down":{cause:"The microwave hop faded progressively before the drop — the profile matches dust attenuation, not hardware failure.",
+   acts:["Switch tenant traffic to the secondary hop","Hold field dispatch 6 h — links usually recover after dust clears","Verify antenna alignment on the next visit"],conf:78},
+ "Rectifier fault":{cause:"Ripple current has risen for 9 days. The battery bank is now carrying peak load unaided.",
+   acts:["Ship a replacement module on the next regional run","Cap tenant power draw until the swap","Capacity-test the battery bank on site"],conf:86},
+ "Generator fuel low":{cause:"Consumption runs 18% above the modelled rate for this load — likely a leak or unmetered draw.",
+   acts:["Schedule refuel within 48 h","Inspect fuel line and tank seals","Reconcile the last three refuel logs"],conf:74},
+ "Shelter temperature high":{cause:"Cooling efficiency has fallen with ambient heat and dust loading on the filters.",
+   acts:["Clean filters and condenser coil","Advance the next preventive-maintenance visit","Reseal shelter before the summer peak"],conf:69},
+ "Door open / intrusion":{cause:"Door sensor open with no matching work order in the field system for this window.",
+   acts:["Confirm with the regional field team","Pull the last 24 h of access logs","Escalate to security if unmatched after 30 min"],conf:64},
+ "Battery bank degraded":{cause:"Measured autonomy has fallen to roughly 61% of nameplate across the last four discharges.",
+   acts:["Plan bank replacement in the next quarterly window","Reduce backup commitments in the tenant SLA view","Re-test after replacement"],conf:81}
+};
+const AI_GLOBAL=[
+ {t:"Dust event forecast for Qassim and Northern regions in 36 h — 41 sites exposed, 9 with filter maintenance still open.",tag:"Weather risk",conf:88,act:s=>s.region==="Qassim"||s.region==="Northern"},
+ {t:"Battery autonomy trending below SLA at Eastern region sites — failure likely inside 21 days.",tag:"Predictive",conf:83,act:s=>s.region==="Eastern"&&s.status!=="active"},
+ {t:"Repeat power alarms cluster on three Riyadh feeders. Hybrid-solar retrofit pays back in 2.7 years.",tag:"Capex",conf:76,act:s=>s.name==="Riyadh"&&s.status!=="active"},
+ {t:"Ground leases expiring within 90 days carry no renewal notice — two host three tenants each.",tag:"Commercial",conf:94,act:s=>s.leaseStart+s.leaseYears<=2027}
+];
+
+/* ---------------- KPIs ---------------- */
+const tenancy=sites.reduce((a,s)=>a+s.tenants.length,0);
+const capacity=sites.reduce((a,s)=>a+s.capacity,0);
+const avail=d3.mean(sites,s=>s.uptime);
+document.getElementById("kTotal").textContent=nf(sites.length);
+document.getElementById("kAvail").firstChild.textContent=avail.toFixed(1);
+document.getElementById("kAction").textContent=nf(cnt("attention")+cnt("critical"));
+document.getElementById("kRatio").firstChild.textContent=(tenancy/sites.length).toFixed(2);
+document.getElementById("kMix").innerHTML=["active","attention","critical","inactive"]
+  .map(k=>`<i style="width:${cnt(k)/sites.length*100}%;background:${COLORS[k]}"></i>`).join("");
+document.getElementById("kMixCap").textContent=`${Math.round(cnt("active")/sites.length*100)}% active · ${cnt("inactive")} inactive`;
+document.getElementById("kSlots").innerHTML=`<i style="width:${tenancy/capacity*100}%;background:var(--brand)"></i>`;
+document.getElementById("kSlotsCap").textContent=`${nf(tenancy)} of ${nf(capacity)} slots let`;
+{
+  const ring=d3.select("#kRing"),c=2*Math.PI*12.5,p=(avail-95)/5;
+  ring.append("circle").attr("cx",15).attr("cy",15).attr("r",12.5).attr("fill","none").attr("stroke","#eff0f1").attr("stroke-width",4);
+  ring.append("circle").attr("cx",15).attr("cy",15).attr("r",12.5).attr("fill","none").attr("stroke","#FF5A14")
+    .attr("stroke-width",4).attr("stroke-linecap","round").attr("stroke-dasharray",`${c*p} ${c}`).attr("transform","rotate(-90 15 15)");
+  const trend=[9,12,8,14,11,16,cnt("attention")+cnt("critical")>30?18:12];
+  document.getElementById("kTrend").innerHTML=trend.map((v,i)=>`<i class="${i===6?"hot":""}" style="height:${v/18*100}%"></i>`).join("");
+}
+
+/* insights */
+const aiList=document.getElementById("aiList");
+AI_GLOBAL.forEach((a,i)=>aiList.insertAdjacentHTML("beforeend",
+ `<div class="aiitem" data-ai="${i}"><div class="t">${a.t}</div>
+  <div class="m">${a.tag} · ${a.conf}% confidence<span class="conf"><i style="width:${a.conf}%"></i></span></div></div>`));
+aiList.querySelectorAll(".aiitem").forEach(el=>el.onclick=()=>{
+  const a=AI_GLOBAL[+el.dataset.ai];
+  setCity("all",false);aiFilter=a.act;filter="all";syncStatusList();
+  document.getElementById("aiChipLabel").textContent="Insight · "+a.tag;
+  document.getElementById("aiChip").classList.add("show");
+  const hit=sites.filter(a.act);draw();
+  if(hit.length)select(hit[0],true);
+});
+document.getElementById("aiChipClear").onclick=()=>{aiFilter=null;document.getElementById("aiChip").classList.remove("show");draw()};
+
+/* status filter list */
+const statusList=document.getElementById("statusList");
+statusList.innerHTML=[["all","All sites","#191a1b",sites.length]]
+  .concat(["active","attention","critical","inactive"].map(k=>[k,LABEL[k],COLORS[k],cnt(k)]))
+  .map(([k,l,c,v])=>`<div class="stat-row${k==="all"?" on":""}" data-k="${k}"><i style="background:${c}"></i><span>${l}</span><span class="num">${nf(v)}</span></div>`).join("");
+statusList.querySelectorAll(".stat-row").forEach(el=>el.onclick=()=>setFilter(el.dataset.k));
+function syncStatusList(){statusList.querySelectorAll(".stat-row").forEach(el=>el.classList.toggle("on",el.dataset.k===filter))}
+
+/* alarms */
+const alarmSites=sites.filter(s=>s.alarm).sort((a,b)=>(a.alarm.sev===b.alarm.sev?a.alarm.mins-b.alarm.mins:a.alarm.sev==="critical"?-1:1));
+document.getElementById("alarmList").innerHTML=alarmSites.slice(0,4).map(s=>{
+  const c=s.alarm.sev==="critical";
+  return `<div class="alarm" data-id="${s.id}">
+    <span class="alarm-t">${s.alarm.kind}</span>
+    <span class="alarm-time" style="background:${c?"var(--red50)":"var(--amber50)"};color:${c?"var(--red700)":"var(--amber700)"}">${c?"P1":"P3"} · ${ago(s.alarm.mins)}</span>
+    <span class="alarm-s">${s.id} · ${s.name}</span></div>`}).join("");
+document.querySelectorAll(".alarm").forEach(el=>el.onclick=()=>select(sites.find(s=>s.id===el.dataset.id),true));
+document.getElementById("allAlarms").onclick=()=>setFilter("critical");
+
+/* leaseholders */
+const byTenant={};sites.forEach(s=>s.tenants.forEach(t=>byTenant[t.name]=(byTenant[t.name]||0)+1));
+const tMax=Math.max(...Object.values(byTenant));
+document.getElementById("tenantTotal").textContent=nf(tenancy)+" leases";
+document.getElementById("tenantBars").innerHTML=Object.entries(byTenant).sort((a,b)=>b[1]-a[1]).slice(0,4).map(([name,c])=>{
+  const pal=OPS.find(o=>o[0]===name);
+  return `<div class="bar-item" data-tenant="${name}"><span class="bar-name">${name}</span><span class="bar-num">${nf(c)} sites</span>
+    <span class="bar-track"><span class="bar-fill" style="width:${c/tMax*100}%;background:${pal[2]}"></span></span></div>`}).join("");
+document.querySelectorAll("[data-tenant]").forEach(el=>el.onclick=()=>{
+  const box=document.getElementById("searchBox");box.classList.add("open");
+  document.getElementById("searchInput").value=el.dataset.tenant;applySearch(el.dataset.tenant);
+});
+
+/* ---------------- filters ---------------- */
+let filter="all",search="",city="all",aiFilter=null;
+function setFilter(k){filter=k;syncStatusList();draw()}
+function visible(s){
+  if(filter!=="all"&&s.status!==filter)return false;
+  if(city!=="all"&&s.name!==city)return false;
+  if(aiFilter&&!aiFilter(s))return false;
+  if(search){
+    const hay=(s.id+" "+s.name+" "+s.region+" "+s.tenants.map(t=>t.name).join(" ")).toLowerCase();
+    if(!hay.includes(search))return false;
+  }
+  return true;
+}
+
+/* location dropdown */
+const cityCounts=CITIES.map(c=>[c[0],sites.filter(s=>s.name===c[0]).length,c[2],c[3]]).sort((a,b)=>b[1]-a[1]);
+const locMenu=document.getElementById("locMenu");
+document.getElementById("locCount").textContent=nf(sites.length);
+locMenu.innerHTML=`<button class="locitem on" data-city="all">All Kingdom<b>${nf(sites.length)}</b></button>
+  <div class="locgroup">By site count</div>`+
+  cityCounts.map(([nm,c])=>`<button class="locitem" data-city="${nm}">${nm}<b>${c}</b></button>`).join("");
+const locBtn=document.getElementById("locBtn");
+locBtn.onclick=e=>{e.stopPropagation();locMenu.classList.toggle("open")};
+locMenu.querySelectorAll(".locitem").forEach(b=>b.onclick=()=>{
+  aiFilter=null;document.getElementById("aiChip").classList.remove("show");
+  setCity(b.dataset.city,true);locMenu.classList.remove("open");
+});
+document.addEventListener("click",e=>{if(!locMenu.contains(e.target)&&e.target!==locBtn)locMenu.classList.remove("open")});
+function setCity(name,fly){
+  city=name;
+  locMenu.querySelectorAll(".locitem").forEach(x=>x.classList.toggle("on",x.dataset.city===name));
+  const lc=cityCounts.find(c=>c[0]===name);
+  document.getElementById("locLabel").textContent=name==="all"?"All Kingdom":name;
+  document.getElementById("locCount").textContent=nf(name==="all"?sites.length:(lc?lc[1]:0));
+  locBtn.classList.toggle("on",name!=="all");
+  draw();
+  if(!fly)return;
+  if(name==="all"){flyTo(d3.zoomIdentity);setWx(null)}
+  else{
+    const list=sites.filter(s=>s.name===name);
+    flyToPoint(d3.mean(list,d=>d.lon),d3.mean(list,d=>d.lat),name==="Riyadh"||name==="Jeddah"?4.2:5.6);
+    setWx(list[0]);
+  }
+}
+document.getElementById("clearAll").onclick=()=>{
+  aiFilter=null;document.getElementById("aiChip").classList.remove("show");
+  search="";document.getElementById("searchInput").value="";filter="all";syncStatusList();setCity("all",true);
+};
+
+/* search */
+const searchBox=document.getElementById("searchBox"),searchInput=document.getElementById("searchInput");
+document.getElementById("searchIcon").onclick=e=>{
+  e.stopPropagation();
+  searchBox.classList.toggle("open");
+  if(searchBox.classList.contains("open"))searchInput.focus();
+  else{searchInput.value="";applySearch("")}
+};
+searchInput.addEventListener("input",e=>applySearch(e.target.value));
+function applySearch(v){search=v.trim().toLowerCase();draw()}
+
+/* ---------------- weather ---------------- */
+const wxIcon=(icon,size,color)=>{
+  const c=color||"#535659";
+  if(icon==="dust")return `<svg width="${size}" height="${size}" viewBox="0 0 20 20" fill="none" stroke="${c}" stroke-width="1.4" stroke-linecap="round"><path d="M3 7h10M6 10.5h11M3 14h9"/><circle cx="15" cy="6" r="2"/></svg>`;
+  if(icon==="rain")return `<svg width="${size}" height="${size}" viewBox="0 0 20 20" fill="none" stroke="${c}" stroke-width="1.4" stroke-linecap="round"><path d="M6 11a3.4 3.4 0 0 1 .5-6.7A4.4 4.4 0 0 1 15 5.6 3 3 0 0 1 14.5 11z"/><path d="M7.5 14v2M11 14v2.6M14 14v2"/></svg>`;
+  if(icon==="humid")return `<svg width="${size}" height="${size}" viewBox="0 0 20 20" fill="none" stroke="${c}" stroke-width="1.4" stroke-linecap="round"><path d="M10 3.5s4.5 5 4.5 8a4.5 4.5 0 0 1-9 0c0-3 4.5-8 4.5-8z"/></svg>`;
+  if(icon==="haze")return `<svg width="${size}" height="${size}" viewBox="0 0 20 20" fill="none" stroke="${c}" stroke-width="1.4" stroke-linecap="round"><circle cx="10" cy="8" r="3.2"/><path d="M4 13.5h12M6 16.5h8"/></svg>`;
+  return `<svg width="${size}" height="${size}" viewBox="0 0 20 20" fill="none" stroke="${c}" stroke-width="1.4" stroke-linecap="round"><circle cx="10" cy="10" r="3.4"/><path d="M10 3v1.6M10 15.4V17M3 10h1.6M15.4 10H17M5.2 5.2l1.1 1.1M13.7 13.7l1.1 1.1M14.8 5.2l-1.1 1.1M6.3 13.7l-1.1 1.1"/></svg>`;
+};
+function setWx(s){
+  const w=s?s.wx:{cond:"Clear",icon:"clear",temp:38,wind:14,risk:0};
+  document.getElementById("wxPill").innerHTML=`${wxIcon(w.icon,17,w.risk?"#8e6b00":"#535659")}
+    <span><b>${w.temp}°C</b> ${w.cond}</span><span class="sep"></span><span>Wind <b>${w.wind}</b> km/h</span>
+    <span class="sep"></span><span style="color:var(--n900)">${s?s.name:"Riyadh"}</span>`;
+}
+
+/* ---------------- map ---------------- */
+const svg=d3.select("#map"),tip=document.getElementById("tip");
+let W=0,H=0,projection,path,gGeo,gDots,zoom,k=1,mode="sites",selected=null,root;
+document.getElementById("basemapSeg").querySelectorAll("button").forEach(b=>b.onclick=()=>{
+  mode=b.dataset.mode;
+  document.getElementById("basemapSeg").querySelectorAll("button").forEach(x=>x.classList.toggle("on",x===b));
+  draw();
+});
+
+d3.json("https://cdn.jsdelivr.net/npm/world-atlas@2.0.2/countries-110m.json").then(topo=>{
+  const countries=topojson.feature(topo,topo.objects.countries).features;
+  const saudi=countries.find(f=>f.properties.name==="Saudi Arabia");
+  const others=countries.filter(f=>f!==saudi);
+  const defs=svg.append("defs");
+  defs.html(`
+    <filter id="terrain" x="-5%" y="-5%" width="110%" height="110%">
+      <feTurbulence id="terrainNoise" type="fractalNoise" baseFrequency="0.0055" numOctaves="6" seed="11" result="n"/>
+      <feDiffuseLighting in="n" lighting-color="#ffffff" surfaceScale="2.6" result="l">
+        <feDistantLight azimuth="310" elevation="52"/>
+      </feDiffuseLighting>
+      <feComposite in="l" in2="SourceAlpha" operator="in"/>
+    </filter>
+    <filter id="soften" x="-3%" y="-3%" width="106%" height="106%">
+      <feGaussianBlur stdDeviation="1.1" result="b"/>
+      <feComponentTransfer in="b"><feFuncA type="linear" slope="2.2" intercept="-0.45"/></feComponentTransfer>
+    </filter>`);
+  root=svg.append("g");
+  gGeo=root.append("g");gDots=root.append("g");
+
+  function size(){
+    const r=document.querySelector(".stage").getBoundingClientRect();
+    W=r.width;H=r.height;
+    svg.attr("viewBox",`0 0 ${W} ${H}`);
+    projection=d3.geoMercator().fitExtent([[430,70],[W-370,H-70]],saudi);
+    path=d3.geoPath(projection);
+    gGeo.selectAll("*").remove();
+
+    gGeo.selectAll("path.other").data(others).join("path").attr("class","other").attr("d",path)
+      .attr("fill","#e4e7e8").attr("stroke","#dcdfe0").attr("stroke-width",1).attr("data-w",1)
+      .attr("stroke-linejoin","round").attr("filter","url(#soften)");
+    gGeo.append("path").datum(d3.geoGraticule().step([5,5])()).attr("d",path)
+      .attr("fill","none").attr("stroke","#e2e5e6").attr("stroke-width",.5).attr("data-w",.5);
+    gGeo.append("path").datum(saudi).attr("class","ksa-base").attr("d",path)
+      .attr("fill","#f8f9f9").attr("stroke","none").attr("stroke-linejoin","round").attr("filter","url(#soften)");
+    gGeo.append("path").datum(saudi).attr("class","ksa-terrain").attr("d",path)
+      .attr("fill","#cfd4d6").attr("stroke","none").attr("filter","url(#terrain)").attr("opacity",.5);
+    gGeo.append("path").datum(saudi).attr("class","ksa-line").attr("d",path)
+      .attr("fill","none").attr("stroke","#9aa0a3").attr("stroke-width",1.2).attr("data-w",1.2)
+      .attr("stroke-linejoin","round").attr("stroke-linecap","round");
+
+    const line=d3.line().x(d=>projection(d)[0]).y(d=>projection(d)[1]).curve(d3.curveBasis);
+    const cpos={};CITIES.forEach(c=>cpos[c[0]]=[c[3],c[2]]);
+    gGeo.selectAll("path.bb").data(BACKBONE.filter(p=>cpos[p[0]]&&cpos[p[1]])).join("path").attr("class","bb")
+      .attr("d",d=>line([cpos[d[0]],cpos[d[1]]])).attr("fill","none")
+      .attr("stroke","#c2c7ca").attr("stroke-width",.9).attr("data-w",.9).attr("stroke-dasharray","3 3");
+
+    gGeo.selectAll("text.lbl-water").data([["Red Sea",20.4,38.1],["Arabian Gulf",27.5,51.5]])
+      .join("text").attr("class","lbl-water")
+      .attr("x",d=>projection([d[2],d[1]])[0]).attr("y",d=>projection([d[2],d[1]])[1])
+      .attr("text-anchor","middle").text(d=>d[0]);
+    gGeo.selectAll("text.lbl-city").data(cityCounts.filter(c=>c[1]>=10)).join("text").attr("class","lbl-city")
+      .attr("x",d=>projection([d[3],d[2]])[0]+9).attr("y",d=>projection([d[3],d[2]])[1]-8).text(d=>d[0]);
+    labelScale();draw();
+  }
+  zoom=d3.zoom().scaleExtent([1,10]).on("zoom",e=>{
+    root.attr("transform",e.transform);k=e.transform.k;
+    gGeo.selectAll("path[data-w]").attr("stroke-width",function(){return +this.getAttribute("data-w")/k});
+    gGeo.selectAll("path.bb").attr("stroke-dasharray",(3/k)+" "+(3/k));
+    labelScale();scaleDots();
+  });
+  svg.call(zoom);
+  document.getElementById("zin").onclick=()=>flyScale(1.6);
+  document.getElementById("zout").onclick=()=>flyScale(1/1.6);
+  document.getElementById("zreset").onclick=()=>flyTo(d3.zoomIdentity);
+  size();
+  new ResizeObserver(size).observe(document.querySelector(".stage"));
+  setWx(null);
+});
+
+let flyRaf=null,flyEnd=null;
+function flyTo(target,dur){
+  if(!zoom)return;dur=dur||520;
+  const cur=d3.zoomTransform(svg.node());
+  const ix=d3.interpolate(cur.x,target.x),iy=d3.interpolate(cur.y,target.y),ik=d3.interpolate(cur.k,target.k);
+  const t0=performance.now();
+  if(flyRaf)cancelAnimationFrame(flyRaf);
+  if(flyEnd)clearTimeout(flyEnd);
+  const step=now=>{
+    const p=Math.min(1,(now-t0)/dur),e=p<.5?2*p*p:1-Math.pow(-2*p+2,2)/2;
+    svg.call(zoom.transform,d3.zoomIdentity.translate(ix(e),iy(e)).scale(ik(e)));
+    if(p<1)flyRaf=requestAnimationFrame(step);
+  };
+  flyRaf=requestAnimationFrame(step);
+  flyEnd=setTimeout(()=>svg.call(zoom.transform,target),dur+80);
+}
+function flyScale(f){
+  const c=d3.zoomTransform(svg.node()),nk=Math.max(1,Math.min(10,c.k*f)),cx=W/2,cy=H/2;
+  flyTo(d3.zoomIdentity.translate(cx-(cx-c.x)*nk/c.k,cy-(cy-c.y)*nk/c.k).scale(nk),300);
+}
+function flyToPoint(lon,lat,z){
+  const p=projection([lon,lat]);
+  flyTo(d3.zoomIdentity.translate((W+60)/2,H/2).scale(z).translate(-p[0],-p[1]));
+}
+function labelScale(){
+  if(!gGeo)return;
+  const cs=10/Math.pow(k,.8),sw=(3/k)+"px";
+  gGeo.selectAll("text.lbl-city").style("font-size",cs+"px").style("stroke-width",sw);
+  gGeo.selectAll("text.lbl-water").style("font-size",(9/Math.pow(k,.85))+"px");
+  gDots.selectAll("text.cluster-lbl").style("font-size",cs+"px").style("stroke-width",sw);
+  const nz=svg.select("#terrainNoise");
+  if(!nz.empty())nz.attr("baseFrequency",(0.0055*k).toFixed(5));
+}
+function scaleDots(){
+  gDots.selectAll("circle.site").attr("r",d=>(d.status==="critical"?4.4:3.3)/Math.pow(k,.72))
+    .attr("stroke-width",1.1/Math.pow(k,.8));
+  gDots.selectAll("circle.halo").attr("r",10.5/Math.pow(k,.72)).attr("stroke-width",1.2/Math.pow(k,.8));
+  gDots.selectAll("g.sel circle").attr("r",12.5/Math.pow(k,.72)).attr("stroke-width",1.4/Math.pow(k,.8));
+  gDots.selectAll("g.sel line").attr("stroke-width",1/Math.pow(k,.8));
+}
+
+function draw(){
+  if(!projection)return;
+  const shown=sites.filter(visible);
+  document.getElementById("noMatch").classList.toggle("show",shown.length===0);
+  gDots.selectAll("*").remove();
+
+  if(mode==="density"){
+    const byCity={};shown.forEach(s=>{(byCity[s.name]=byCity[s.name]||[]).push(s)});
+    const arr=Object.entries(byCity).map(([name,list])=>({name,list,
+      lat:d3.mean(list,d=>d.lat),lon:d3.mean(list,d=>d.lon),n:list.length,
+      bad:list.filter(x=>x.status!=="active").length}));
+    const rs=d3.scaleSqrt().domain([1,d3.max(arr,d=>d.n)||1]).range([8,34]);
+    gDots.selectAll("circle.bub").data(arr).join("circle").attr("class","bub")
+      .attr("cx",d=>projection([d.lon,d.lat])[0]).attr("cy",d=>projection([d.lon,d.lat])[1])
+      .attr("r",d=>rs(d.n)).attr("fill","#FF5A14").attr("fill-opacity",.16)
+      .attr("stroke","#d94500").attr("stroke-opacity",.55).attr("stroke-width",1).style("cursor","pointer")
+      .on("mousemove",(e,d)=>showTip(e,`<b>${d.name}</b><br><span class="tt-sub">${d.n} sites · ${d.bad} need attention</span>`))
+      .on("mouseleave",hideTip).on("click",(e,d)=>select(d.list[0],true));
+    gDots.selectAll("text.cluster-lbl").data(arr.filter(d=>d.n>=8)).join("text").attr("class","cluster-lbl")
+      .attr("x",d=>projection([d.lon,d.lat])[0]).attr("y",d=>projection([d.lon,d.lat])[1]-rs(d.n)-5)
+      .attr("text-anchor","middle").text(d=>`${d.name} ${d.n}`);
+    labelScale();scaleDots();return;
+  }
+
+  gDots.selectAll("circle.halo").data(shown.filter(s=>s.status==="critical")).join("circle").attr("class","halo")
+    .attr("cx",d=>projection([d.lon,d.lat])[0]).attr("cy",d=>projection([d.lon,d.lat])[1])
+    .attr("fill","#e51c010f").attr("stroke","#e51c0159").style("pointer-events","none");
+  gDots.selectAll("circle.site").data(shown,d=>d.id).join("circle").attr("class","site")
+    .attr("cx",d=>projection([d.lon,d.lat])[0]).attr("cy",d=>projection([d.lon,d.lat])[1])
+    .attr("fill",d=>COLORS[d.status]).attr("stroke","#f8f9f9").style("cursor","pointer")
+    .on("mousemove",(e,d)=>showTip(e,`<b>${d.id}</b><br><span class="tt-sub">${d.name}, ${d.region} · ${LABEL[d.status]} · ${d.wx.temp}°C ${d.wx.cond}</span>`))
+    .on("mouseleave",hideTip).on("click",(e,d)=>select(d,false));
+
+  if(selected&&shown.includes(selected)){
+    const p=projection([selected.lon,selected.lat]);
+    const g=gDots.append("g").attr("class","sel").style("pointer-events","none");
+    g.append("circle").attr("cx",p[0]).attr("cy",p[1]).attr("fill","none").attr("stroke","#191a1b");
+    [[-1,0],[1,0],[0,-1],[0,1]].forEach(([dx,dy])=>g.append("line")
+      .attr("x1",p[0]+dx*14/Math.pow(k,.72)).attr("y1",p[1]+dy*14/Math.pow(k,.72))
+      .attr("x2",p[0]+dx*20/Math.pow(k,.72)).attr("y2",p[1]+dy*20/Math.pow(k,.72))
+      .attr("stroke","#191a1b").attr("stroke-linecap","round"));
+  }
+  scaleDots();
+}
+function showTip(e,html){
+  const r=document.querySelector(".stage").getBoundingClientRect();
+  tip.innerHTML=html;tip.style.left=(e.clientX-r.left)+"px";tip.style.top=(e.clientY-r.top-10)+"px";tip.style.opacity=1;
+}
+function hideTip(){tip.style.opacity=0}
+
+/* ---------------- detail ---------------- */
+const detail=document.getElementById("detail");
+function select(s,recentre){
+  selected=s;
+  if(!s){detail.classList.remove("show");detail.innerHTML="";setWx(null);draw();return}
+  setWx(s);
+  const ai=s.alarm?AI_SITE[s.alarm.kind]:null;
+  const yearsLeft=s.leaseStart+s.leaseYears-2026;
+  const spark=Array.from({length:22},(_,i)=>{
+    const base=(s.uptime-97.4)/2.55;
+    const v=Math.max(.12,Math.min(1,base*.7+.25+Math.sin(i*1.3+s.height)*.12));
+    return `<i style="height:${v*100}%;background:${i>17?"var(--brand)":"var(--n400)"}"></i>`}).join("");
+  const wxRisk=s.wx.risk===2?`Sandstorm risk within 12 h — gusts to ${s.wx.gust} km/h. Hold tower climbs.`
+             :s.wx.risk===1?`Blowing dust, visibility ${s.wx.vis} km. Expect microwave fade and filter loading.`
+             :s.wx.wind>38?`Wind gusting to ${s.wx.gust} km/h — above the safe climb threshold.`:"";
+  const badge=(t,bg,fg,dot)=>`<span class="badge" style="background:${bg};color:${fg}">${dot?`<i style="background:${dot}"></i>`:""}${t}</span>`;
+  detail.innerHTML=`
+    <div class="detail-top">
+      <span>${s.type} · ${s.region} Region</span>
+      <button class="railbtn" style="width:24px;height:24px;border-radius:6px" id="closeDetail" title="Close">
+        <svg width="13" height="13" viewBox="0 0 16 16" stroke="currentColor" stroke-width="1.5"><path d="M4 4l8 8M12 4l-8 8" stroke-linecap="round"/></svg></button>
+    </div>
+    <div class="detail-scroll">
+      <h2>${s.id}</h2>
+      <div class="place">${s.name} · ${s.lat.toFixed(4)}, ${s.lon.toFixed(4)}</div>
+      <div class="badges">
+        ${badge(LABEL[s.status],TONE[s.status][0],TONE[s.status][1],COLORS[s.status])}
+        ${badge(s.power,"#f7f7f7","#535659")}
+        ${badge(s.tenants.length+"/"+s.capacity+" slots let","#fff2ec","#953000")}
+      </div>
+      ${s.alarm?`<div class="banner${s.alarm.sev==="attention"?" warn":""}">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round" style="flex:0 0 14px;margin-top:1px"><path d="M7 2.5 12.5 12h-11z"/><path d="M7 6v2.4" stroke-linecap="round"/></svg>
+        <span><b>${s.alarm.kind}</b><br>Raised ${ago(s.alarm.mins)} ago · ${s.alarm.sev==="critical"?"P1 — field team dispatched":"P3 — next scheduled visit"}</span></div>`:""}
+      ${ai?`<div class="aiblock">
+        <div class="h"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><path d="M8 2v3M8 11v3M2 8h3M11 8h3M4.2 4.2l2 2M9.8 9.8l2 2M11.8 4.2l-2 2M6.2 9.8l-2 2"/></svg> AI diagnosis</div>
+        <div class="cause">${ai.cause}</div>
+        <ol>${ai.acts.map((a,i)=>`<li><em>${i+1}</em><span>${a}</span></li>`).join("")}</ol>
+        <div class="foot">Confidence ${ai.conf}%<span class="conf" style="max-width:60px"><i style="width:${ai.conf}%"></i></span><span style="margin-left:auto">site-health v4</span></div>
+      </div>`:""}
+      <div class="wx">
+        <div class="sect-head"><span class="sect-title">Field weather</span><span class="r">updated 6 min ago</span></div>
+        <div class="wx-top">
+          <div><div class="wx-temp">${s.wx.temp}°C</div><div class="wx-cond">${s.wx.cond} · feels ${s.wx.temp+Math.round(s.wx.hum/18)}°C</div></div>
+          ${wxIcon(s.wx.icon,32,s.wx.risk?"#8e6b00":"#535659")}
+        </div>
+        <div class="wx-grid">
+          <div class="wx-cell"><div class="k">Wind</div><div class="v">${s.wx.wind} km/h</div></div>
+          <div class="wx-cell"><div class="k">Humidity</div><div class="v">${s.wx.hum}%</div></div>
+          <div class="wx-cell"><div class="k">Visibility</div><div class="v">${s.wx.vis} km</div></div>
+        </div>
+        ${wxRisk?`<div class="wx-note">${wxRisk}</div>`:""}
+      </div>
+      <div class="spec-grid">
+        <div class="spec"><div class="lbl">Uptime 30 d</div><div class="val">${s.uptime.toFixed(2)}<small>%</small></div><div class="spark">${spark}</div></div>
+        <div class="spec"><div class="lbl">Height</div><div class="val">${s.height}<small>m</small></div><div class="lbl" style="margin-top:8px;text-transform:none;letter-spacing:0;font-weight:400">Last visit ${s.lastVisit} d ago</div></div>
+        <div class="spec"><div class="lbl">Tenants</div><div class="val">${s.tenants.length}<small>of ${s.capacity}</small></div></div>
+        <div class="spec"><div class="lbl">Annual rent</div><div class="val">${(s.tenants.reduce((a,t)=>a+t.rent,0)/1000).toFixed(0)}<small>k SAR</small></div></div>
+      </div>
+      <div class="tenants">
+        <div class="sect-head"><span class="sect-title">Leaseholders</span><span class="r">${s.tenants.length}/${s.capacity} slots</span></div>
+        ${s.tenants.length?s.tenants.map(t=>`<div class="tenant">
+          <span class="avatar" style="background:${t.pal[1]};color:${t.pal[2]}">${t.name.slice(0,2).toUpperCase()}</span>
+          <span><span class="tn">${t.name}</span><br><span class="ts">Colocation since ${t.since}</span></span>
+          <span class="right">${nf(t.rent)} SAR/yr</span></div>`).join("")
+        :`<div class="tenant"><span class="ts">No colocation — site available for lease.</span></div>`}
+      </div>
+      <div class="lease">
+        <div class="sect-head"><span class="sect-title">Ground lease</span><span class="r">${yearsLeft>0?yearsLeft+" yrs left":"renewal overdue"}</span></div>
+        <div class="lease-rows">
+          <div class="r"><span>Term</span><span>${s.leaseYears} years from ${s.leaseStart}</span></div>
+          <div class="r"><span>Expiry</span><span>31 Dec ${s.leaseStart+s.leaseYears}</span></div>
+          <div class="r"><span>Land status</span><span>${s.type==="Rooftop tower"?"Rooftop licence":"Freehold plot"}</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="detail-foot">
+      <button class="btn btn-primary">${s.alarm?"Dispatch work order":"Schedule inspection"}</button>
+      <button class="btn btn-sec">Site log</button>
+    </div>`;
+  detail.classList.add("show");
+  document.getElementById("closeDetail").onclick=()=>select(null,false);
+  if(recentre&&projection)flyToPoint(s.lon,s.lat,5);
+  draw();
+}
+</script>
+</body>
+</html>
